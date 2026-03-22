@@ -266,8 +266,8 @@ def check_learning_checkin_installed():
     possible_paths.append(os.path.join(SCRIPT_DIR, "..", "..", "learning-checkin"))
 
     # Look in active_skills
-    if "COPAW_DIR" in os.environ:
-        possible_paths.append(os.path.join(os.environ["COPAW_DIR"], "active_skills", "learning-checkin"))
+    if "OPENCLAW_DIR" in os.environ:
+        possible_paths.append(os.path.join(os.environ["OPENCLAW_DIR"], "active_skills", "learning-checkin"))
 
     # Check if learning_checkin.py exists in any of these paths
     for path in possible_paths:
