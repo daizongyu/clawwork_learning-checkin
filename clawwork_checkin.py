@@ -21,7 +21,7 @@ if sys.platform == "win32":
 
 
 # Configuration
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 VERSION_CHECK_URL = "https://github.com/daizongyu/clawwork_learning-checkin"
 
 # Get the directory where this script is located

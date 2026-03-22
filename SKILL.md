@@ -1,7 +1,7 @@
 ---
 name: clawwork-learning-checkin
-description: Workplace check-in skill for Agent (小龙虾) with AI-generated personalized greetings
-metadata: { "copaw": { "emoji": "work" } }
+description: Workplace check-in skill for Agent (Claw) with AI-generated personalized greetings
+metadata: { "OpenClaw": { "emoji": "work" } }
 ---
 
 # Clawwork Learning Check-in Skill
@@ -252,7 +252,7 @@ python <skill_path>/clawwork_checkin.py status
 - Compatible with Windows, Linux, macOS
 - Uses Python standard library only (no external dependencies)
 - All file paths are relative to the skill directory
-- Does not use absolute paths or copaw-specific paths
+- Does not use absolute paths
 - Designed to work with OpenClaw, copaw, and other tools
 - Subprocess calls to learning-checkin have 10-second timeout
 
