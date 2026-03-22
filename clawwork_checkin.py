@@ -32,48 +32,63 @@ PROFILE_FILE = os.path.join(DATA_DIR, "profile.json")
 GREETINGS_FILE = os.path.join(DATA_DIR, "greetings.json")
 VERSION_FILE = os.path.join(DATA_DIR, "version.txt")
 
-# Default messages in English only (no emoji)
-WELCOME_MESSAGES = [
-    "Welcome to work! Time to check in and start your productive day!",
-    "Good morning! Ready to check in and make today count?",
-    "It's work time! Let's check in and get energized!",
-    "New day, new opportunities! Time to check in!",
-    "Work mode activated! Check in and let's do this!",
-    "Another day to be productive! Check in now!",
-    "Let's make today amazing! Start with a check-in!",
-    "Ready to tackle the day? Check in first!",
-    "Work awaits! Check in and get ready to shine!",
-    "Fresh start today! Check in and let's go!"
-]
+# Welcome message prompt for Agent (no emoji)
+WELCOME_PROMPT = {
+    "type": "welcome",
+    "description": "Generate an energetic workplace check-in welcome message",
+    "requirements": [
+        "Encourage the user to start their work day",
+        "Be energetic and positive",
+        "Keep it concise (1-2 sentences)",
+        "No emoji, plain text only",
+        "In the user's preferred language"
+    ],
+    "examples": [
+        "Time to check in and start your productive day!",
+        "Ready to make today count? Let's check in!",
+        "Fresh start today! Check in and let's go!"
+    ]
+}
 
-# Post check-in greetings (randomized, no repetition)
-DAILY_GREETINGS = [
-    "How are you feeling today?",
-    "What's your plan for today?",
-    "Ready to make today productive?",
-    "How's your energy level this morning?",
-    "Any exciting tasks on your plate today?",
-    "What's the most important thing you want to accomplish today?",
-    "How's everything going so far?",
-    "What are you looking forward to today?",
-    "Any challenges you're ready to tackle?",
-    "How can I help make your day better?",
-    "What's top of your mind today?",
-    "Ready to make progress on your goals?",
-    "How's the morning treating you?",
-    "Any fun plans after work?",
-    "What did you sleep well?",
-    "Coffee or tea today?",
-    "How's the weather treating you?",
-    "Any meetings you're excited about?",
-    "What's one thing you want to learn today?",
-    "How's your week going so far?",
-    "Any wins you're celebrating today?",
-    "What's keeping you busy these days?",
-    "How do you feel about today's schedule?",
-    "Any deadlines coming up?",
-    "What motivates you most today?"
-]
+# Daily greeting prompt for Agent (no emoji)
+DAILY_GREETING_PROMPT = {
+    "type": "daily_greeting",
+    "description": "Generate a casual question to ask after check-in",
+    "requirements": [
+        "Be conversational and friendly",
+        "Ask about their day, plans, or how they're feeling",
+        "Keep it short (1 sentence)",
+        "No emoji, plain text only",
+        "In the user's preferred language",
+        "Avoid repeating questions from the past 5 days"
+    ],
+    "examples": [
+        "How are you feeling today?",
+        "What's your plan for today?",
+        "Any exciting tasks on your plate?",
+        "What's top of your mind today?"
+    ]
+}
+
+# Success message prompt for Agent
+SUCCESS_PROMPT = {
+    "type": "success",
+    "description": "Generate a check-in success message with streak",
+    "requirements": [
+        "Congratulate the user on their check-in",
+        "Include the streak count",
+        "Be energetic and encouraging",
+        "Keep it concise (1-2 sentences)",
+        "No emoji, plain text only",
+        "In the user's preferred language"
+    ],
+    "special_streaks": {
+        "1": "First day - welcome to the streak!",
+        "7": "One week streak - keep it up!",
+        "30": "One month - amazing consistency!",
+        "100": "100 days - you're a pro!"
+    }
+}
 
 
 def ensure_dir():
@@ -113,16 +128,18 @@ def load_greetings():
     """Load greeting history to avoid repetition."""
     if not os.path.exists(GREETINGS_FILE):
         return {
-            "used_greetings": [],
-            "last_checkin_date": None
+            "welcome_history": {},      # {"2026-03-22": "message"}
+            "greeting_history": {},     # {"2026-03-22": "message"}
+            "past_5_days": []           # List of recent messages for deduplication
         }
     try:
         with open(GREETINGS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, IOError):
         return {
-            "used_greetings": [],
-            "last_checkin_date": None
+            "welcome_history": {},
+            "greeting_history": {},
+            "past_5_days": []
         }
 
 
@@ -138,34 +155,97 @@ def get_today():
     return datetime.datetime.now().strftime("%Y-%m-%d")
 
 
-def get_random_greeting():
-    """Get a random greeting that hasn't been used recently."""
+def get_past_5_days():
+    """Get list of past 5 days (including today)."""
+    today = datetime.datetime.now()
+    days = []
+    for i in range(5):
+        day = today - datetime.timedelta(days=i)
+        days.append(day.strftime("%Y-%m-%d"))
+    return days
+
+
+def get_used_messages(greetings_data, msg_type):
+    """Get messages used in past 5 days for a specific type."""
+    past_5_days = get_past_5_days()
+    history = greetings_data.get(f"{msg_type}_history", {})
+    used = []
+    for day in past_5_days:
+        if day in history:
+            msg = history[day]
+            if msg:
+                used.append(msg)
+    return used
+
+
+def register_message(msg_type, message):
+    """Register a message used today for history tracking."""
     greetings_data = load_greetings()
-    used_today = greetings_data.get("used_greetings", [])
-    last_date = greetings_data.get("last_checkin_date", "")
-
-    # Reset used greetings if it's a new day
     today = get_today()
-    if last_date != today:
-        used_today = []
 
-    # Filter out recently used greetings
-    available_greetings = [g for g in DAILY_GREETINGS if g not in used_today]
+    # Save to today's history
+    history_key = f"{msg_type}_history"
+    if history_key not in greetings_data:
+        greetings_data[history_key] = {}
 
-    # If all greetings used, reset and allow all
-    if not available_greetings:
-        available_greetings = DAILY_GREETINGS.copy()
+    greetings_data[history_key][today] = message
 
-    # Pick a random greeting
-    greeting = random.choice(available_greetings)
+    # Update past_5_days list
+    past_5_days = greetings_data.get("past_5_days", [])
+    if message not in past_5_days:
+        past_5_days.append(message)
+    # Keep only last 10 messages (2 days worth to be safe)
+    greetings_data["past_5_days"] = past_5_days[-10:]
 
-    # Update greeting history
-    used_today.append(greeting)
-    greetings_data["used_greetings"] = used_today[-10:]  # Keep last 10
-    greetings_data["last_checkin_date"] = today
+    # Clean old entries (keep only last 7 days)
+    cutoff = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+    for key in ["welcome_history", "greeting_history"]:
+        hist = greetings_data.get(key, {})
+        filtered = {k: v for k, v in hist.items() if k >= cutoff}
+        greetings_data[key] = filtered
+
     save_greetings(greetings_data)
+    return True
 
-    return greeting
+
+def get_welcome_prompt():
+    """Get welcome message generation prompt for Agent."""
+    greetings_data = load_greetings()
+    used_messages = get_used_messages(greetings_data, "welcome")
+
+    result = {
+        "prompt": WELCOME_PROMPT,
+        "used_recently": used_messages,
+        "user_language": load_profile().get("language", "en")
+    }
+    return result
+
+
+def get_greeting_prompt():
+    """Get daily greeting generation prompt for Agent."""
+    greetings_data = load_greetings()
+    used_messages = get_used_messages(greetings_data, "greeting")
+
+    result = {
+        "prompt": DAILY_GREETING_PROMPT,
+        "used_recently": used_messages,
+        "user_language": load_profile().get("language", "en")
+    }
+    return result
+
+
+def get_success_prompt(streak):
+    """Get success message generation prompt for Agent."""
+    profile = load_profile()
+    special = SUCCESS_PROMPT.get("special_streaks", {})
+
+    result = {
+        "prompt": SUCCESS_PROMPT,
+        "streak": streak,
+        "special_message": special.get(str(streak)),
+        "user_language": profile.get("language", "en")
+    }
+    return result
 
 
 def get_version():
@@ -198,31 +278,6 @@ def check_learning_checkin_installed():
     return False, None
 
 
-def get_welcome_message():
-    """Get a random welcome message."""
-    return random.choice(WELCOME_MESSAGES)
-
-
-def get_checkin_success_message(streak):
-    """Get check-in success message."""
-    if streak == 1:
-        return "Check-in successful! Great start to your work day!"
-    elif streak == 7:
-        return "One week streak! Keep up the excellent work!"
-    elif streak == 30:
-        return "30 days! You're building an amazing habit!"
-    elif streak == 100:
-        return "100 days! You are a true professional!"
-    else:
-        messages = [
-            f"Checked in! {streak} days and counting!",
-            f"Success! {streak} consecutive days!",
-            f"Done! {streak} day streak - keep it going!",
-            f"Check-in complete! {streak} days strong!"
-        ]
-        return random.choice(messages).format(streak=streak)
-
-
 # CLI Interface
 def main():
     """Main CLI interface."""
@@ -230,8 +285,11 @@ def main():
         print("Usage: python clawwork_checkin.py <command> [args]")
         print("Commands:")
         print("  check-installed    - Check if learning-checkin is installed")
-        print("  welcome            - Get welcome message")
-        print("  greeting           - Get random daily greeting")
+        print("  welcome-prompt     - Get welcome message generation prompt")
+        print("  greeting-prompt    - Get daily greeting generation prompt")
+        print("  success-prompt     - Get success message prompt (requires streak)")
+        print("  register-welcome <msg>   - Register welcome message used today")
+        print("  register-greeting <msg>  - Register daily greeting used today")
         print("  checkin            - Perform workplace check-in")
         print("  version            - Get current version")
         print("  profile            - Get user profile")
@@ -252,16 +310,48 @@ def main():
         }
         print(json.dumps(result, ensure_ascii=False, indent=2))
 
-    elif command == "welcome":
+    elif command == "welcome-prompt":
+        result = get_welcome_prompt()
+        result["version"] = VERSION
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+
+    elif command == "greeting-prompt":
+        result = get_greeting_prompt()
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+
+    elif command == "success-prompt":
+        streak = 0
+        if len(sys.argv) >= 3:
+            try:
+                streak = int(sys.argv[2])
+            except ValueError:
+                pass
+        result = get_success_prompt(streak)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+
+    elif command == "register-welcome":
+        if len(sys.argv) < 3:
+            print("Usage: python clawwork_checkin.py register-welcome <message>")
+            sys.exit(1)
+        message = " ".join(sys.argv[2:])  # Join remaining args
+        register_message("welcome", message)
         result = {
-            "message": get_welcome_message(),
-            "version": VERSION
+            "success": True,
+            "message": "Welcome message registered",
+            "registered": message
         }
         print(json.dumps(result, ensure_ascii=False, indent=2))
 
-    elif command == "greeting":
+    elif command == "register-greeting":
+        if len(sys.argv) < 3:
+            print("Usage: python clawwork_checkin.py register-greeting <message>")
+            sys.exit(1)
+        message = " ".join(sys.argv[2:])  # Join remaining args
+        register_message("greeting", message)
         result = {
-            "greeting": get_random_greeting()
+            "success": True,
+            "message": "Greeting message registered",
+            "registered": message
         }
         print(json.dumps(result, ensure_ascii=False, indent=2))
 
@@ -302,15 +392,22 @@ def main():
                     # Get check-in streak from learning-checkin
                     streak = checkin_result.get("streak", 0)
 
-                    # Get random greeting for after check-in
-                    greeting = get_random_greeting()
+                    # Get prompts for Agent to generate messages
+                    welcome_prompt = get_welcome_prompt()
+                    greeting_prompt = get_greeting_prompt()
+                    success_prompt = get_success_prompt(streak)
 
                     result = {
                         "success": True,
                         "streak": streak,
-                        "message": get_checkin_success_message(streak),
-                        "daily_greeting": greeting,
                         "nickname": nickname,
+                        "welcome_prompt": welcome_prompt["prompt"],
+                        "welcome_used_recently": welcome_prompt["used_recently"],
+                        "greeting_prompt": greeting_prompt["prompt"],
+                        "greeting_used_recently": greeting_prompt["used_recently"],
+                        "success_prompt": success_prompt["prompt"],
+                        "special_streak_message": success_prompt.get("special_message"),
+                        "user_language": profile.get("language", "en"),
                         "note": f"You can check for newer versions at {VERSION_CHECK_URL}"
                     }
                     print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -318,7 +415,7 @@ def main():
                     result = {
                         "success": True,
                         "message": "Check-in recorded!",
-                        "daily_greeting": get_random_greeting()
+                        "greeting_prompt": get_greeting_prompt()["prompt"]
                     }
                     print(json.dumps(result, ensure_ascii=False, indent=2))
             else:
