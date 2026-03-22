@@ -1,6 +1,6 @@
 # Clawwork Learning Check-in
 
-Workplace check-in skill for Agent (小龙虾) with AI-generated personalized greetings.
+Workplace check-in skill for Agent (claw) with AI-generated personalized greetings.
 
 ## Features
 
@@ -56,6 +56,6 @@ python clawwork_checkin.py version
 
 ## Version
 
-1.0.0
+1.0.1
 
 Check for updates: https://github.com/daizongyu/clawwork_learning-checkin

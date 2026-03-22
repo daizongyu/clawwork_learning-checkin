@@ -264,7 +264,7 @@ Users can customize:
 
 ## Version
 
-Current version: 1.0.0
+Current version: 1.0.1
 
 Check for updates: https://github.com/daizongyu/clawwork_learning-checkin
 
